@@ -27,7 +27,7 @@ export const options: AuthOptions = {
         const user = {
           id: "3c13473d-a4f1-4dcc-a192-3d9008964d32",
           name: "Raul",
-          password: "secretPassword",
+          password: "palabraSecreta",
         };
         if (
           credentials?.username === user.name &&
