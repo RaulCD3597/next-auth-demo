@@ -65,12 +65,17 @@ export const options: AuthOptions = {
           access_token: account.access_token,
           expires_at: account.expires_at,
           refresh_token: account.refresh_token,
+          provider: account.provider,
         };
       } else if (Date.now() < token.expires_at * 1000) {
         // logins subsecuentes en los que el token no ha expirado
         return token;
       } else {
         // logins subsecuentes donde el token esta expirado
+        token.error = undefined;
+        if (token.provider === "credentials" || token.provider === "github") {
+          return token;
+        }
         try {
           if (!token.refreshToken) throw new TypeError("Missing refreshToken");
           // el endpoint para refrescar el token se encuentra en la documentacion
@@ -113,7 +118,6 @@ export const options: AuthOptions = {
       }
     },
     async session({ session, token }) {
-      console.log(token);
       if (token) {
         session.user.name = token?.name ?? "";
         session.user.image = token?.picture ?? "";
@@ -151,6 +155,7 @@ declare module "next-auth/jwt" {
     access_token: string;
     expires_at: number;
     refresh_token?: string;
+    provider: string;
     error?: "RefreshTokenError";
   }
 }
