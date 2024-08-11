@@ -79,8 +79,8 @@ export const options: AuthOptions = {
         try {
           if (!token.refreshToken) throw new TypeError("Missing refreshToken");
           // el endpoint para refrescar el token se encuentra en la documentacion
-          // especifica de cada proveedor. en este caso github:
-          // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens
+          // especifica de cada proveedor. en este caso auth0:
+          // https://auth0.com/docs/secure/tokens/refresh-tokens/use-refresh-tokens#use-post-authentication
           const response = await axios.request({
             method: "POST",
             url: `${process.env.AUTH0_ISSUER}/oauth/token`,
