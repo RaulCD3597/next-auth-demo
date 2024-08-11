@@ -1,6 +1,8 @@
 import type { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
+import Auth0Provider from "next-auth/providers/auth0";
+import axios from "axios";
 
 export const options: AuthOptions = {
   providers: [
@@ -43,7 +45,86 @@ export const options: AuthOptions = {
       clientId: process.env.GITHUB_ID as string,
       clientSecret: process.env.GITHUB_SECRET as string,
     }),
+    Auth0Provider({
+      clientId: process.env.AUTH0_CLIENT_ID as string,
+      clientSecret: process.env.AUTH0_CLIENT_SECRET as string,
+      issuer: process.env.AUTH0_ISSUER,
+      authorization: {
+        // auth0 requires offline_access scope to send a refresh_token
+        params: { scope: "openid email profile offline_access" },
+      },
+    }),
   ],
+  callbacks: {
+    // @ts-ignore: Unreachable code error
+    async jwt({ token, account }) {
+      if (account) {
+        // primer login
+        return {
+          ...token,
+          access_token: account.access_token,
+          expires_at: account.expires_at,
+          refresh_token: account.refresh_token,
+        };
+      } else if (Date.now() < token.expires_at * 1000) {
+        // logins subsecuentes en los que el token no ha expirado
+        return token;
+      } else {
+        // logins subsecuentes donde el token esta expirado
+        try {
+          if (!token.refreshToken) throw new TypeError("Missing refreshToken");
+          // el endpoint para refrescar el token se encuentra en la documentacion
+          // especifica de cada proveedor. en este caso github:
+          // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens
+          const response = await axios.request({
+            method: "POST",
+            url: `${process.env.AUTH0_ISSUER}/oauth/token`,
+            headers: { "content-type": "application/x-www-form-urlencoded" },
+            data: {
+              grant_type: "refresh_token",
+              client_id: process.env.AUTH0_CLIENT_ID,
+              client_secret: process.env.AUTH0_CLIENT_SECRET,
+              refresh_token: token.refresh_token,
+            },
+          });
+
+          const tokensOrError = await response.data;
+
+          const newTokens = tokensOrError as {
+            access_token: string;
+            expires_in: number;
+            refresh_token?: string;
+          };
+
+          token.access_token = newTokens.access_token;
+          token.expires_at = Math.floor(
+            Date.now() / 1000 + newTokens.expires_in,
+          );
+          // solo reasignamos el refresh_token si el provedro solo hace uso unico del mismo
+          if (newTokens.refresh_token)
+            token.refresh_token = newTokens.refresh_token;
+          return token;
+        } catch (error) {
+          console.error("Error refreshing accessToken", error);
+          // retornamos el error para que sea la pagina la que decida que hacer
+          token.error = "RefreshTokenError";
+          return token;
+        }
+      }
+    },
+    async session({ session, token }) {
+      console.log(token);
+      if (token) {
+        session.user.name = token?.name ?? "";
+        session.user.image = token?.picture ?? "";
+        session.user.email = token?.email ?? "";
+        session.access_token = token.access_token;
+        session.error = token.error;
+      }
+
+      return session;
+    },
+  },
   // pages: {
   //   signIn: "/auth/signin",
   //   signOut: "/auth/signout",
@@ -52,3 +133,24 @@ export const options: AuthOptions = {
   //   newUser: "/auth/new-user",
   // },
 };
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      name: string;
+      email: string;
+      image: string;
+    };
+    access_token: string;
+    error?: "RefreshTokenError";
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    access_token: string;
+    expires_at: number;
+    refresh_token?: string;
+    error?: "RefreshTokenError";
+  }
+}
