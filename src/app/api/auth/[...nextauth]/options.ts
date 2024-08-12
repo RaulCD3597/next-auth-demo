@@ -29,7 +29,7 @@ export const options: AuthOptions = {
         const user = {
           id: "3c13473d-a4f1-4dcc-a192-3d9008964d32",
           name: "Raul",
-          password: "palabraSecreta",
+          password: "secret",
         };
         if (
           credentials?.username === user.name &&
@@ -62,6 +62,7 @@ export const options: AuthOptions = {
         // primer login
         return {
           ...token,
+          id_token: account.id_token,
           access_token: account.access_token,
           expires_at: account.expires_at,
           refresh_token: account.refresh_token,
@@ -119,6 +120,7 @@ export const options: AuthOptions = {
     },
     async session({ session, token }) {
       if (token) {
+        session.id_token = token.id_token ?? "";
         session.user.name = token?.name ?? "";
         session.user.image = token?.picture ?? "";
         session.user.email = token?.email ?? "";
@@ -146,12 +148,14 @@ declare module "next-auth" {
       image: string;
     };
     access_token: string;
+    id_token: string;
     error?: "RefreshTokenError";
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
+    id_token: string;
     access_token: string;
     expires_at: number;
     refresh_token?: string;
