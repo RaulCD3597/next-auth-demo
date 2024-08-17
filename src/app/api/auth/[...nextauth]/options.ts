@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import Auth0Provider from "next-auth/providers/auth0";
 import axios from "axios";
+import { jwtDecode } from "jwt-decode";
 
 export const options: AuthOptions = {
   providers: [
@@ -60,11 +61,16 @@ export const options: AuthOptions = {
     async jwt({ token, account }) {
       if (account) {
         // primer login
+        let exp = 0;
+        if (account.id_token) {
+          const decoded = jwtDecode(account.id_token);
+          exp = decoded.exp ?? 0;
+        }
         return {
           ...token,
           id_token: account.id_token,
           access_token: account.access_token,
-          expires_at: account.expires_at,
+          expires_at: exp > 0 ? exp : account.expires_at,
           refresh_token: account.refresh_token,
           provider: account.provider,
         };
@@ -100,14 +106,11 @@ export const options: AuthOptions = {
           const newTokens = tokensOrError as {
             id_token: string;
             access_token: string;
-            expires_in: number;
             refresh_token?: string;
           };
 
           token.access_token = newTokens.access_token;
-          token.expires_at = Math.floor(
-            Date.now() / 1000 + newTokens.expires_in,
-          );
+          token.expires_at = jwtDecode(newTokens.id_token).exp!;
           token.id_token = newTokens.id_token;
           // solo reasignamos el refresh_token si el provedro solo hace uso unico del mismo
           if (newTokens.refresh_token)
