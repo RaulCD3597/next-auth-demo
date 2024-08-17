@@ -78,7 +78,8 @@ export const options: AuthOptions = {
           return token;
         }
         try {
-          if (!token.refreshToken) throw new TypeError("Missing refreshToken");
+          if (!token.refresh_token)
+            throw new TypeError("Missing refresh_token");
           // el endpoint para refrescar el token se encuentra en la documentacion
           // especifica de cada proveedor. en este caso auth0:
           // https://auth0.com/docs/secure/tokens/refresh-tokens/use-refresh-tokens#use-post-authentication
@@ -97,6 +98,7 @@ export const options: AuthOptions = {
           const tokensOrError = await response.data;
 
           const newTokens = tokensOrError as {
+            id_token: string;
             access_token: string;
             expires_in: number;
             refresh_token?: string;
@@ -106,6 +108,7 @@ export const options: AuthOptions = {
           token.expires_at = Math.floor(
             Date.now() / 1000 + newTokens.expires_in,
           );
+          token.id_token = newTokens.id_token;
           // solo reasignamos el refresh_token si el provedro solo hace uso unico del mismo
           if (newTokens.refresh_token)
             token.refresh_token = newTokens.refresh_token;
