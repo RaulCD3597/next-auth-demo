@@ -7,7 +7,7 @@ export default async function ServerPage() {
   const session = await getServerSession(options);
 
   if (!session || session?.error === "RefreshTokenError") {
-    redirect("/api/auth/signin?callbackUrl=/server");
+    redirect("/auth/signin?callbackUrl=/server");
   }
 
   return (
